@@ -195,7 +195,8 @@ class _AssignmentTwoState extends State<AssignmentTwo> {
                   },
                 ),
                 FlatButton(
-                    onPressed: () => _onSubmit(context), child: Text('Add'))
+                    onPressed: () => _onSubmit(context),
+                    child: Text('Add Details'))
               ],
             ),
           ),
