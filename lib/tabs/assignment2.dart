@@ -48,11 +48,12 @@ class _AssignmentTwoState extends State<AssignmentTwo> {
   }
 
   _onSubmit(ctx) {
-    _form.currentState.save();
     final isValid = _form.currentState.validate();
     if (!isValid) {
       return;
     }
+    _form.currentState.save();
+
     showAlertDialog(ctx);
   }
 
