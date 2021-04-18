@@ -1,8 +1,11 @@
+import 'package:assignment1/widgets/addpost.dart';
+
 import '../models/post.dart';
 import '../widgets/postlist.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:provider/provider.dart';
 
 class NewPost extends StatefulWidget {
   @override
@@ -10,27 +13,11 @@ class NewPost extends StatefulWidget {
 }
 
 class _NewPostState extends State<NewPost> {
-  final titleController = TextEditingController();
-
-  final bodyController = TextEditingController();
-
-  final userIdController = TextEditingController();
-
-  final _bodyFocusNode = FocusNode();
-
-  final _userIdFocusNode = FocusNode();
-
-  final _form = GlobalKey<FormState>();
+  var _initialValues = {'title': '', 'body': '', 'userId': '', 'id': null};
   var _isLoading = false;
   var _isInit = true;
-
   List<PostForm> _items = [];
-
-  var _userData = PostForm(
-    title: '',
-    body: '',
-    userId: 0,
-  );
+  var _editedPost = PostForm(title: '', body: '', userId: 0, id: '');
 
   @override
   void initState() {
@@ -53,43 +40,7 @@ class _NewPostState extends State<NewPost> {
     super.didChangeDependencies();
   }
 
-  _validateFields(value) {
-    print(value);
-    if (value.isEmpty) {
-      return 'Field is required';
-    } else {
-      return null;
-    }
-  }
-
-  _onSubmit(ctx) {
-    final isValid = _form.currentState.validate();
-    if (!isValid) {
-      return;
-    }
-    _form.currentState.save();
-    final url = Uri.parse(
-        'https://flutter-learning-b838c-default-rtdb.firebaseio.com//posts.json');
-    http
-        .post(
-          url,
-          body: json.encode({
-            'title': _userData.title,
-            'body': _userData.body,
-            'userId': _userData.userId,
-          }),
-        )
-        .then((res) => {
-              showAlertDialog(ctx),
-              setState(() {
-                _isLoading = true;
-              }),
-              fetchAndSetUserFormList()
-            });
-  }
-
   Future<void> fetchAndSetUserFormList() async {
-    _form.currentState?.reset();
     _items = [];
     final url = Uri.parse(
         'https://flutter-learning-b838c-default-rtdb.firebaseio.com//posts.json');
@@ -104,6 +55,7 @@ class _NewPostState extends State<NewPost> {
             userId: userData['userId'],
             title: userData['title'],
             body: userData['body'],
+            id: prodId,
           ));
         });
       }
@@ -116,16 +68,43 @@ class _NewPostState extends State<NewPost> {
     }
   }
 
+  editPost(id) {
+    _editedPost = _items.firstWhere((post) => post.id == id);
+    _initialValues = {
+      'title': _editedPost.title,
+      'body': _editedPost.body,
+      'id': _editedPost.id,
+      'userId': _editedPost.userId.toString()
+    };
+    addNewPost(context, true);
+  }
+
+  addNewPost(BuildContext ctx, isEdit) {
+    if (!isEdit) {
+      _initialValues = {'title': '', 'body': '', 'userId': '', 'id': null};
+    }
+    showModalBottomSheet(
+        context: ctx,
+        builder: (_) {
+          return GestureDetector(
+            child: AddPost(_initialValues, fetchAndSetUserFormList),
+            onTap: () {},
+          );
+        });
+  }
+
   showAlertDialog(BuildContext context) {
+    var alertTxt;
     Widget okButton = FlatButton(
       child: Text("OK"),
       onPressed: () {
         Navigator.of(context).pop();
+        fetchAndSetUserFormList();
       },
     );
 
     AlertDialog alert = AlertDialog(
-      title: Text("Submitted Form"),
+      title: Text('Record Deleted'),
       actions: [
         okButton,
       ],
@@ -139,6 +118,19 @@ class _NewPostState extends State<NewPost> {
     );
   }
 
+  deletePost(id, ctx) {
+    print(id);
+    _editedPost = _items.firstWhere((post) => post.id == id);
+    print(_editedPost.title);
+    final url = Uri.parse(
+        'https://flutter-learning-b838c-default-rtdb.firebaseio.com/posts/${id}.json');
+    http
+        .delete(
+          url,
+        )
+        .then((res) => {showAlertDialog(ctx)});
+  }
+
   @override
   Widget build(BuildContext context) {
     return _isLoading
@@ -146,82 +138,14 @@ class _NewPostState extends State<NewPost> {
             child: CircularProgressIndicator(),
           )
         : Container(
-            child: Form(
-              key: _form,
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Title',
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: (value) => _validateFields(titleController.text),
-                    onFieldSubmitted: (_) {
-                      FocusScope.of(context).requestFocus(_bodyFocusNode);
-                    },
-                    onSaved: (value) {
-                      _userData = PostForm(
-                        title: value,
-                        body: _userData.body,
-                        userId: _userData.userId,
-                      );
-                    },
-                  ),
-                  TextFormField(
-                    controller: bodyController,
-                    decoration: InputDecoration(
-                      labelText: 'Body',
-                    ),
-                    maxLines: 550,
-                    minLines: 2,
-                    onFieldSubmitted: (_) {
-                      FocusScope.of(context).requestFocus(_userIdFocusNode);
-                    },
-                    keyboardType: TextInputType.multiline,
-                    validator: (value) => _validateFields(bodyController.text),
-                    onSaved: (value) {
-                      _userData = PostForm(
-                        title: _userData.title,
-                        body: value,
-                        userId: _userData.userId,
-                      );
-                    },
-                  ),
-                  TextFormField(
-                    decoration: InputDecoration(
-                      labelText: 'User ID',
-                    ),
-                    validator: (value) {
-                      if (value.isEmpty) {
-                        return 'Field is required';
-                      } else if (int.tryParse(value) == null) {
-                        return 'Enter valid Number';
-                      } else if (int.parse(value) > 120) {
-                        return 'Age cannot be greater than 120';
-                      } else if (int.tryParse(value) <= 0) {
-                        return 'Please enter a age greater than zero.';
-                      } else {
-                        return null;
-                      }
-                    },
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.number,
-                    onSaved: (value) {
-                      _userData = PostForm(
-                        title: _userData.title,
-                        body: _userData.body,
-                        userId: int.parse(value),
-                      );
-                    },
-                  ),
-                  FlatButton(
-                      onPressed: () => _onSubmit(context),
-                      child: Text('Add Details')),
-                  PostList(_items)
-                ],
+            child: Column(
+            children: [
+              RaisedButton(
+                onPressed: () => addNewPost(context, false),
+                child: Text('Add New Post'),
               ),
-            ),
-          );
+              PostList(_items, editPost, deletePost)
+            ],
+          ));
   }
 }
